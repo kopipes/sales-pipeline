@@ -18,6 +18,12 @@ export class CompaniesController {
     return this.companiesService.findAll(search, industryId);
   }
 
+  @Get('industries')
+  @RequirePermissions({ resource: 'companies', action: 'read' })
+  async getIndustries() {
+    return this.companiesService.getIndustries();
+  }
+
   @Get(':id')
   @RequirePermissions({ resource: 'companies', action: 'read' })
   async findOne(@Param('id') id: string) {

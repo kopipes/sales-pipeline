@@ -9,10 +9,8 @@ export class CompaniesService {
     const where: any = {};
 
     if (search) {
-      where.name = {
-        contains: search,
-        mode: 'insensitive',
-      };
+      // SQLite does not support mode: 'insensitive', use plain contains
+      where.name = { contains: search };
     }
 
     if (industryId) {
@@ -68,6 +66,10 @@ export class CompaniesService {
     }
 
     return company;
+  }
+
+  async getIndustries() {
+    return this.prisma.industry.findMany({ orderBy: { name: 'asc' } });
   }
 
   async create(data: any) {

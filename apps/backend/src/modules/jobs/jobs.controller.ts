@@ -27,6 +27,12 @@ export class JobsController {
     return this.jobsService.summary(user, periodYear);
   }
 
+  @Get('categories')
+  @RequirePermissions({ resource: 'jobs', action: 'read' })
+  async getCategories() {
+    return this.jobsService.getCategories();
+  }
+
   @Get(':id')
   @RequirePermissions({ resource: 'jobs', action: 'read' })
   async findOne(@Param('id') id: string) {

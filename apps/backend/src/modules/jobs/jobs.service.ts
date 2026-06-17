@@ -92,6 +92,10 @@ export class JobsService {
     return this.withPnl(updated);
   }
 
+  async getCategories() {
+    return this.prisma.jobCategory.findMany({ orderBy: { name: 'asc' } });
+  }
+
   async remove(id: string) {
     const job = await this.prisma.job.findUnique({ where: { id } });
 

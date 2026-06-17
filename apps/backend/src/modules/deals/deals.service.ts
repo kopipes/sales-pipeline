@@ -216,6 +216,14 @@ export class DealsService {
     return { ...this.withWeighted(result.deal), createdJob: result.job };
   }
 
+  async getDealTypes() {
+    return this.prisma.dealType.findMany({ orderBy: { name: 'asc' } });
+  }
+
+  async getStages() {
+    return this.prisma.pipelineStage.findMany({ orderBy: { sortOrder: 'asc' } });
+  }
+
   async remove(id: string) {
     const deal = await this.prisma.deal.findUnique({ where: { id } });
 

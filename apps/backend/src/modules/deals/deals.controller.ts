@@ -27,6 +27,18 @@ export class DealsController {
     return this.dealsService.atRisk(user);
   }
 
+  @Get('types')
+  @RequirePermissions({ resource: 'deals', action: 'read' })
+  async getDealTypes() {
+    return this.dealsService.getDealTypes();
+  }
+
+  @Get('stages')
+  @RequirePermissions({ resource: 'deals', action: 'read' })
+  async getStages() {
+    return this.dealsService.getStages();
+  }
+
   @Get(':id')
   @RequirePermissions({ resource: 'deals', action: 'read' })
   async findOne(@Param('id') id: string) {
