@@ -1,5 +1,8 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { DashboardService } from './dashboard.service';
+import { SearchService } from './search.service';
+import { ExportService } from './export.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
@@ -8,7 +11,11 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @Controller('dashboard')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DashboardController {
-  constructor(private dashboardService: DashboardService) {}
+  constructor(
+    private dashboardService: DashboardService,
+    private searchService: SearchService,
+    private exportService: ExportService,
+  ) {}
 
   @Get('overview')
   @RequirePermissions({ resource: 'dashboard', action: 'read' })
@@ -72,5 +79,65 @@ export class DashboardController {
     @Query('divisionId') divisionId?: string,
   ) {
     return this.dashboardService.recentActivities(user, { divisionId });
+  }
+
+  @Get('search')
+  @RequirePermissions({ resource: 'dashboard', action: 'read' })
+  async search(
+    @CurrentUser() user: any,
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.searchService.globalSearch(
+      user,
+      q ?? '',
+      limit ? parseInt(limit, 10) : 5,
+    );
+  }
+
+  @Get('export/deals')
+  @RequirePermissions({ resource: 'deals', action: 'export' })
+  async exportDeals(
+    @CurrentUser() user: any,
+    @Query('stageId') stageId?: string,
+    @Query('dealTypeId') dealTypeId?: string,
+    @Query('search') search?: string,
+    @Res() res?: Response,
+  ) {
+    const buffer = await this.exportService.exportDeals(user, { stageId, dealTypeId, search });
+    const filename = `deals-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res!.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res!.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res!.end(buffer);
+  }
+
+  @Get('export/jobs')
+  @RequirePermissions({ resource: 'jobs', action: 'export' })
+  async exportJobs(
+    @CurrentUser() user: any,
+    @Query('periodYear') periodYear?: string,
+    @Res() res?: Response,
+  ) {
+    const buffer = await this.exportService.exportJobs(user, { periodYear });
+    const filename = `jobs-pnl-${periodYear ?? new Date().getFullYear()}.xlsx`;
+    res!.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res!.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res!.end(buffer);
+  }
+
+  @Get('export/dashboard')
+  @RequirePermissions({ resource: 'dashboard', action: 'export' })
+  async exportDashboard(
+    @CurrentUser() user: any,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('divisionId') divisionId?: string,
+    @Res() res?: Response,
+  ) {
+    const buffer = await this.exportService.exportDashboard(user, { startDate, endDate, divisionId });
+    const filename = `dashboard-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res!.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res!.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res!.end(buffer);
   }
 }

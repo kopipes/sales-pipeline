@@ -86,6 +86,14 @@ export class UsersService {
     return user;
   }
 
+  async getRoles() {
+    return this.prisma.role.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, scopeLevel: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async create(data: any) {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: data.email },

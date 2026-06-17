@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CreateJobDto } from './dto/create-job.dto';
 
 @Controller('jobs')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -41,7 +42,7 @@ export class JobsController {
 
   @Post()
   @RequirePermissions({ resource: 'jobs', action: 'create' })
-  async create(@CurrentUser() user: any, @Body() data: any) {
+  async create(@CurrentUser() user: any, @Body() data: CreateJobDto) {
     return this.jobsService.create(user, data);
   }
 

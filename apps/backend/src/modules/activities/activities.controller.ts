@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CreateActivityDto } from './dto/create-activity.dto';
 
 @Controller('activities')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -29,7 +30,7 @@ export class ActivitiesController {
 
   @Post()
   @RequirePermissions({ resource: 'activities', action: 'create' })
-  async create(@CurrentUser() user: any, @Body() data: any) {
+  async create(@CurrentUser() user: any, @Body() data: CreateActivityDto) {
     return this.activitiesService.create(user, data);
   }
 

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './modules/prisma/prisma.module';
+import { CommonModule } from './common/common.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { DivisionsModule } from './modules/divisions/divisions.module';
@@ -17,6 +18,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
       isGlobal: true,
     }),
     PrismaModule,
+    CommonModule,
     AuthModule,
     UsersModule,
     DivisionsModule,

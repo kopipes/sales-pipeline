@@ -6,14 +6,14 @@ import { buildScopeWhere, ScopedUser } from '../../common/utils/scope.util';
 export class JobsService {
   constructor(private prisma: PrismaService) {}
 
-  private withPnl<T extends { salesAmount: number; cogsAmount: number }>(job: T) {
-    const operatingProfit = job.salesAmount - job.cogsAmount;
+  private withPnl<T extends { salesAmount: any; cogsAmount: any }>(job: T) {
+    const sales = Number(job.salesAmount);
+    const cogs = Number(job.cogsAmount);
+    const operatingProfit = sales - cogs;
     // null-safe operating profit % (PRD 7.5 - corrects #DIV/0! in old file)
     const operatingProfitPct =
-      job.salesAmount > 0
-        ? Math.round((operatingProfit / job.salesAmount) * 10000) / 100
-        : 0;
-    return { ...job, operatingProfit, operatingProfitPct };
+      sales > 0 ? Math.round((operatingProfit / sales) * 10000) / 100 : 0;
+    return { ...job, salesAmount: sales, cogsAmount: cogs, operatingProfit, operatingProfitPct };
   }
 
   async findAll(
@@ -136,14 +136,16 @@ export class JobsService {
     let totalCogs = 0;
 
     for (const job of jobs) {
-      const op = job.salesAmount - job.cogsAmount;
-      totalSales += job.salesAmount;
-      totalCogs += job.cogsAmount;
+      const sales = Number(job.salesAmount);
+      const cogs = Number(job.cogsAmount);
+      const op = sales - cogs;
+      totalSales += sales;
+      totalCogs += cogs;
 
       const m = monthly[job.periodMonth - 1];
       if (m) {
-        m.salesAmount += job.salesAmount;
-        m.cogsAmount += job.cogsAmount;
+        m.salesAmount += sales;
+        m.cogsAmount += cogs;
         m.operatingProfit += op;
         m.jobCount += 1;
       }
@@ -155,8 +157,8 @@ export class JobsService {
         cogsAmount: 0,
         operatingProfit: 0,
       };
-      byCategory[catName].salesAmount += job.salesAmount;
-      byCategory[catName].cogsAmount += job.cogsAmount;
+      byCategory[catName].salesAmount += sales;
+      byCategory[catName].cogsAmount += cogs;
       byCategory[catName].operatingProfit += op;
 
       const divName = job.division?.name ?? 'Unknown';
@@ -166,8 +168,8 @@ export class JobsService {
         cogsAmount: 0,
         operatingProfit: 0,
       };
-      byDivision[divName].salesAmount += job.salesAmount;
-      byDivision[divName].cogsAmount += job.cogsAmount;
+      byDivision[divName].salesAmount += sales;
+      byDivision[divName].cogsAmount += cogs;
       byDivision[divName].operatingProfit += op;
     }
 

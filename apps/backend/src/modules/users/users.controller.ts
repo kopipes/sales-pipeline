@@ -16,6 +16,12 @@ export class UsersController {
     return this.usersService.findAll(user.scopeLevel, user.divisionId);
   }
 
+  @Get('roles')
+  @RequirePermissions({ resource: 'users', action: 'read' })
+  async getRoles() {
+    return this.usersService.getRoles();
+  }
+
   @Get(':id')
   @RequirePermissions({ resource: 'users', action: 'read' })
   async findOne(@Param('id') id: string) {

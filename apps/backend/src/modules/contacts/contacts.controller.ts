@@ -3,6 +3,7 @@ import { ContactsService } from './contacts.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { CreateContactDto } from './dto/create-contact.dto';
 
 @Controller('contacts')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -26,7 +27,7 @@ export class ContactsController {
 
   @Post()
   @RequirePermissions({ resource: 'contacts', action: 'create' })
-  async create(@Body() data: any) {
+  async create(@Body() data: CreateContactDto) {
     return this.contactsService.create(data);
   }
 

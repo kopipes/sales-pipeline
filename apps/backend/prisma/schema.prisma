@@ -239,7 +239,7 @@ model Deal {
   salesRepId           String
   dealTypeId           String
   stageId              String
-  estimatedValue       Int       // Rupiah, integer to avoid floating point issues
+  estimatedValue       BigInt       // Rupiah, integer to avoid floating point issues
   probabilityPct       Int       @default(0) // 0-100
   expectedClosingDate  DateTime?
   actualClosingDate    DateTime?
@@ -249,7 +249,7 @@ model Deal {
   // IP Licensing/Sponsorship specific fields
   ipAssetName          String?
   royaltyPct           Float?
-  minimumGuarantee     Int?
+  minimumGuarantee     BigInt?
   
   // Job/Project specific fields
   jobCategoryId        String?
@@ -302,8 +302,8 @@ model Job {
   jobCategoryId      String
   periodMonth        Int      // 1-12
   periodYear         Int
-  salesAmount        Int      // Rupiah
-  cogsAmount         Int      // Cost of Goods Sold
+  salesAmount        BigInt      // Rupiah
+  cogsAmount         BigInt      // Cost of Goods Sold
   billingType        String   // Direct, Agency
   jobStatus          String   @default("Planning") // Planning, Ongoing, Completed, Cancelled
   picId              String
@@ -329,7 +329,7 @@ model Target {
   divisionId    String
   periodMonth   Int?     // null = yearly target
   periodYear    Int
-  targetRevenue Int      // Rupiah
+  targetRevenue BigInt      // Rupiah
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

@@ -6,19 +6,33 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildScopeWhere, ScopedUser } from '../../common/utils/scope.util';
+import { AuditService } from '../../common/services/audit.service';
 
 const RISK_DAYS = 7; // PRD 7.7: deal stuck > N days (default 7) without follow-up
 
 @Injectable()
 export class DealsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private audit: AuditService,
+  ) {}
 
-  private withWeighted<T extends { estimatedValue: number; probabilityPct: number }>(
-    deal: T,
-  ): T & { weightedValue: number } {
+  /** Convert BigInt money fields to Number for JSON serialisation and arithmetic */
+  private normaliseDeal<T extends { estimatedValue: any; probabilityPct: number; minimumGuarantee?: any }>(deal: T) {
     return {
       ...deal,
-      weightedValue: Math.round((deal.estimatedValue * deal.probabilityPct) / 100),
+      estimatedValue: Number(deal.estimatedValue),
+      minimumGuarantee: deal.minimumGuarantee != null ? Number(deal.minimumGuarantee) : deal.minimumGuarantee,
+    };
+  }
+
+  private withWeighted<T extends { estimatedValue: any; probabilityPct: number }>(
+    deal: T,
+  ) {
+    const normalised = this.normaliseDeal(deal);
+    return {
+      ...normalised,
+      weightedValue: Math.round((Number(normalised.estimatedValue) * normalised.probabilityPct) / 100),
     };
   }
 
@@ -117,6 +131,9 @@ export class DealsService {
       },
     });
 
+    // Audit
+    await this.audit.log({ userId: user.id, action: 'create', resource: 'deal', resourceId: deal.id });
+
     return this.withWeighted(deal);
   }
 
@@ -213,6 +230,15 @@ export class DealsService {
       return { deal: updated, job };
     });
 
+    // Audit stage change
+    await this.audit.log({
+      userId: user.id,
+      action: 'approve',
+      resource: 'deal',
+      resourceId: id,
+      changes: { fromStageId: deal.stageId, toStageId, note },
+    });
+
     return { ...this.withWeighted(result.deal), createdJob: result.job };
   }
 
@@ -231,6 +257,7 @@ export class DealsService {
       throw new NotFoundException('Deal not found');
     }
 
+    await this.audit.log({ userId: 'system', action: 'delete', resource: 'deal', resourceId: id });
     return this.prisma.deal.delete({ where: { id } });
   }
 
@@ -278,7 +305,7 @@ export class DealsService {
         company: x.deal.company,
         stage: x.deal.stage.name,
         salesRep: x.deal.salesRep,
-        estimatedValue: x.deal.estimatedValue,
+        estimatedValue: Number(x.deal.estimatedValue),
         reasons: x.reasons,
       }));
 

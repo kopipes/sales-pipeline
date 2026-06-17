@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Download } from 'lucide-react';
 import { jobsApi } from '../../api/jobs';
 import { formatRupiahCompact, formatRupiah, MONTHS } from '../../utils/format';
 import Spinner from '../../components/ui/Spinner';
@@ -44,9 +44,14 @@ export default function JobsPage() {
           <h1 className="text-xl font-bold text-gray-900">Jobs & P&L</h1>
           <p className="text-sm text-gray-500">{jobs?.length ?? 0} job di {year}</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(true)}>
-          <Plus size={15} /> Tambah Job
-        </button>
+        <div className="flex gap-2">
+          <a href={`/api/dashboard/export/jobs?periodYear=${year}`} className="btn-secondary" download aria-label="Export jobs ke Excel">
+            <Download size={14} /> Export
+          </a>
+          <button className="btn-primary" onClick={() => setShowForm(true)}>
+            <Plus size={15} /> Tambah Job
+          </button>
+        </div>
       </div>
 
       {/* P&L Summary cards */}

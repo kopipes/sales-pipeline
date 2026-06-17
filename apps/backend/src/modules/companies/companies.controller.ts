@@ -3,6 +3,7 @@ import { CompaniesService } from './companies.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { CreateCompanyDto } from './dto/create-company.dto';
 
 @Controller('companies')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -32,7 +33,7 @@ export class CompaniesController {
 
   @Post()
   @RequirePermissions({ resource: 'companies', action: 'create' })
-  async create(@Body() data: any) {
+  async create(@Body() data: CreateCompanyDto) {
     return this.companiesService.create(data);
   }
 

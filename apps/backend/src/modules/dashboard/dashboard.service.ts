@@ -46,12 +46,12 @@ export class DashboardService {
       return true;
     });
 
-    const totalPipeline = activeDeals.reduce((s, d) => s + d.estimatedValue, 0);
+    const totalPipeline = activeDeals.reduce((s, d) => s + Number(d.estimatedValue), 0);
     const weightedPipeline = activeDeals.reduce(
-      (s, d) => s + Math.round((d.estimatedValue * d.probabilityPct) / 100),
+      (s, d) => s + Math.round((Number(d.estimatedValue) * d.probabilityPct) / 100),
       0,
     );
-    const wonRevenue = wonDeals.reduce((s, d) => s + d.estimatedValue, 0);
+    const wonRevenue = wonDeals.reduce((s, d) => s + Number(d.estimatedValue), 0);
 
     // Target achievement (PRD 8.2)
     const year = filters.endDate
@@ -60,7 +60,7 @@ export class DashboardService {
     const targetWhere: any = { periodYear: year };
     if (filters.divisionId) targetWhere.divisionId = filters.divisionId;
     const targets = await this.prisma.target.findMany({ where: targetWhere });
-    const targetRevenue = targets.reduce((s, t) => s + t.targetRevenue, 0);
+    const targetRevenue = targets.reduce((s, t) => s + Number(t.targetRevenue), 0);
 
     const forecastedRevenue = wonRevenue + weightedPipeline;
 
@@ -82,7 +82,7 @@ export class DashboardService {
       targetAchievementPct:
         targetRevenue > 0 ? Math.round((wonRevenue / targetRevenue) * 10000) / 100 : 0,
       forecastedRevenue,
-      dealsAtRisk: { count: atRisk.length, value: atRisk.reduce((s, d) => s + d.estimatedValue, 0) },
+      dealsAtRisk: { count: atRisk.length, value: atRisk.reduce((s, d) => s + Number(d.estimatedValue), 0) },
       activeDealCount: activeDeals.length,
       wonDealCount: wonDeals.length,
     };
@@ -107,7 +107,7 @@ export class DashboardService {
         isWon: stage.isWon,
         isLost: stage.isLost,
         count: stageDeals.length,
-        value: stageDeals.reduce((s, d) => s + d.estimatedValue, 0),
+        value: stageDeals.reduce((s, d) => s + Number(d.estimatedValue), 0),
       };
     });
 
@@ -150,8 +150,8 @@ export class DashboardService {
         colorTag: d.division.colorTag,
         value: 0,
       };
-      map[key].value += d.estimatedValue;
-      total += d.estimatedValue;
+      map[key].value += Number(d.estimatedValue);
+      total += Number(d.estimatedValue);
     }
 
     return Object.values(map).map((d: any) => ({

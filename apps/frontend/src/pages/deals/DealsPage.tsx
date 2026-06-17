@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Plus, Search, ChevronRight, AlertTriangle, Download } from 'lucide-react';
 import { dealsApi } from '../../api/deals';
 import { dashboardApi } from '../../api/dashboard';
 import { formatRupiahCompact, formatDate } from '../../utils/format';
@@ -65,9 +65,14 @@ export default function DealsPage() {
           <h1 className="text-xl font-bold text-gray-900">Pipeline / Deals</h1>
           <p className="text-sm text-gray-500">{deals?.length ?? 0} deal ditemukan</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(true)}>
-          <Plus size={15} /> Tambah Deal
-        </button>
+        <div className="flex gap-2">
+          <a href="/api/dashboard/export/deals" className="btn-secondary" download aria-label="Export deals ke Excel">
+            <Download size={14} /> Export
+          </a>
+          <button className="btn-primary" onClick={() => setShowForm(true)}>
+            <Plus size={15} /> Tambah Deal
+          </button>
+        </div>
       </div>
 
       {/* At Risk Banner */}

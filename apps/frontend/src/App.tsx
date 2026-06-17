@@ -9,6 +9,7 @@ import ActivitiesPage from './pages/activities/ActivitiesPage';
 import CompaniesPage from './pages/companies/CompaniesPage';
 import ContactsPage from './pages/contacts/ContactsPage';
 import JobsPage from './pages/jobs/JobsPage';
+import AdminPage from './pages/admin/AdminPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +34,7 @@ export default function App() {
               <Route path="/companies" element={<CompaniesPage />} />
               <Route path="/contacts" element={<ContactsPage />} />
               <Route path="/jobs" element={<JobsPage />} />
+              <Route path="/admin" element={<AdminPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

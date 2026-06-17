@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, AlertTriangle, Target, DollarSign, Activity, Award } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, Target, DollarSign, Activity, Award, Download } from 'lucide-react';
 import { dashboardApi } from '../../api/dashboard';
 import Spinner from '../../components/ui/Spinner';
 import { formatRupiahCompact, formatRupiah, timeAgo } from '../../utils/format';
@@ -96,9 +96,19 @@ export default function DashboardPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Executive Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Real-time sales pipeline overview</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Executive Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Real-time sales pipeline overview</p>
+        </div>
+        <a
+          href="/api/dashboard/export/dashboard"
+          className="btn-secondary"
+          download
+          aria-label="Export dashboard ke Excel"
+        >
+          <Download size={14} /> Export Excel
+        </a>
       </div>
 
       {/* KPI Cards */}
