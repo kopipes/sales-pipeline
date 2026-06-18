@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid,
 } from 'recharts';
-import { TrendingUp, TrendingDown, AlertTriangle, Target, DollarSign, Activity, Award, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, Target, DollarSign, Activity, Award, Download, ChevronLeft, ChevronRight, Filter, X } from 'lucide-react';
 import { dashboardApi } from '../../api/dashboard';
+import { adminApi } from '../../api/admin';
 import Spinner from '../../components/ui/Spinner';
 import { formatRupiahCompact, formatRupiah, timeAgo, MONTHS } from '../../utils/format';
 import clsx from 'clsx';
+import type { Division } from '../../types';
 
 const STAGE_COLORS: Record<string, string> = {
   Lead: '#94A3B8',
@@ -50,39 +52,64 @@ export default function DashboardPage() {
   const [forecastMonth, setForecastMonth] = useState('');
   const ACT_LIMIT = 5;
 
+  // Global filters
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [divisionId, setDivisionId] = useState('');
+
+  const filters = useMemo(() => ({
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+    divisionId: divisionId || undefined,
+  }), [startDate, endDate, divisionId]);
+
+  const hasFilters = !!(startDate || endDate || divisionId);
+
+  const handleClearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setDivisionId('');
+  };
+
+  const { data: divisions } = useQuery<Division[]>({
+    queryKey: ['divisions'],
+    queryFn: () => adminApi.getDivisions(),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data: kpis, isLoading: kLoading } = useQuery({
-    queryKey: ['dashboard', 'kpis'],
-    queryFn: () => dashboardApi.getKpis(),
+    queryKey: ['dashboard', 'kpis', filters],
+    queryFn: () => dashboardApi.getKpis(filters),
   });
 
   const { data: funnel, isLoading: fLoading } = useQuery({
-    queryKey: ['dashboard', 'funnel'],
-    queryFn: () => dashboardApi.getFunnel(),
+    queryKey: ['dashboard', 'funnel', filters],
+    queryFn: () => dashboardApi.getFunnel(filters),
   });
 
   const { data: pipelineByDiv } = useQuery({
-    queryKey: ['dashboard', 'pipeline-by-division'],
-    queryFn: () => dashboardApi.getPipelineByDivision(),
+    queryKey: ['dashboard', 'pipeline-by-division', filters],
+    queryFn: () => dashboardApi.getPipelineByDivision(filters),
   });
 
   const { data: winLoss } = useQuery({
-    queryKey: ['dashboard', 'win-loss'],
-    queryFn: () => dashboardApi.getWinLoss(),
+    queryKey: ['dashboard', 'win-loss', filters],
+    queryFn: () => dashboardApi.getWinLoss(filters),
   });
 
   const { data: activitiesData } = useQuery({
-    queryKey: ['dashboard', 'recent-activities', actPage],
-    queryFn: () => dashboardApi.getRecentActivities({ limit: ACT_LIMIT, offset: actPage * ACT_LIMIT }),
+    queryKey: ['dashboard', 'recent-activities', actPage, divisionId],
+    queryFn: () => dashboardApi.getRecentActivities({ limit: ACT_LIMIT, offset: actPage * ACT_LIMIT, divisionId: divisionId || undefined }),
   });
 
   const { data: leadSource } = useQuery({
-    queryKey: ['dashboard', 'lead-source'],
-    queryFn: () => dashboardApi.getLeadSource(),
+    queryKey: ['dashboard', 'lead-source', filters],
+    queryFn: () => dashboardApi.getLeadSource(filters),
   });
 
   const { data: forecast } = useQuery({
-    queryKey: ['dashboard', 'revenue-forecast', forecastYear, forecastMonth],
-    queryFn: () => dashboardApi.getRevenueForecast({ year: forecastYear, month: forecastMonth || undefined }),
+    queryKey: ['dashboard', 'revenue-forecast', forecastYear, forecastMonth, divisionId],
+    queryFn: () => dashboardApi.getRevenueForecast({ year: forecastYear, month: forecastMonth || undefined, divisionId: divisionId || undefined }),
   });
 
   if (kLoading || fLoading) {
@@ -118,9 +145,65 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold text-gray-900">Executive Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">Real-time sales pipeline overview</p>
         </div>
-        <a href="/api/dashboard/export/dashboard" className="btn-secondary" download aria-label="Export dashboard ke Excel">
+        <a
+          href={`/api/dashboard/export/dashboard${hasFilters ? `?${new URLSearchParams(Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined) as [string, string][])).toString()}` : ''}`}
+          className="btn-secondary"
+          download
+          aria-label="Export dashboard ke Excel"
+        >
           <Download size={14} /> Export Excel
         </a>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="card p-4">
+        <div className="flex items-center gap-2 flex-nowrap overflow-x-auto">
+          <input
+            id="filter-start-date"
+            type="date"
+            className="input py-1.5 text-sm"
+            value={startDate}
+            max={endDate || undefined}
+            onChange={(e) => { setStartDate(e.target.value); setActPage(0); }}
+            aria-label="Filter tanggal mulai"
+          />
+
+          <span className="text-gray-400 text-sm select-none">-</span>
+
+          <input
+            id="filter-end-date"
+            type="date"
+            className="input py-1.5 text-sm"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={(e) => { setEndDate(e.target.value); setActPage(0); }}
+            aria-label="Filter tanggal akhir"
+          />
+
+          <select
+            id="filter-division"
+            className="input py-1.5 text-sm min-w-[160px]"
+            value={divisionId}
+            onChange={(e) => { setDivisionId(e.target.value); setActPage(0); }}
+            aria-label="Filter divisi"
+          >
+            <option value="">Semua Divisi</option>
+            {(divisions ?? []).filter((d) => d.isActive).map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+
+          {hasFilters && (
+            <button
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition-colors"
+              onClick={handleClearFilters}
+              aria-label="Reset semua filter"
+            >
+              <X size={13} />
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -249,24 +332,24 @@ export default function DashboardPage() {
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Pipeline by Divisi</h2>
           {(pipelineByDiv?.length ?? 0) > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height={180}>
+              <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
-                  <Pie data={pipelineByDiv} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={70}>
+                  <Pie data={pipelineByDiv} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80}>
                     {pipelineByDiv!.map((entry) => (
                       <Cell key={entry.divisionId} fill={entry.colorTag ?? '#94A3B8'} />
                     ))}
                   </Pie>
-                  <Legend formatter={(value) => <span className="text-xs text-gray-600">{value}</span>} />
+                  <Tooltip formatter={(value: number) => formatRupiahCompact(value)} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="mt-3 space-y-2">
+              <div className="mt-3 space-y-2.5">
                 {pipelineByDiv!.map((d) => (
-                  <div key={d.divisionId} className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
+                  <div key={d.divisionId} className="flex justify-between items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: d.colorTag ?? '#94A3B8' }} />
-                      <span className="text-xs text-gray-600">{d.name}</span>
+                      <span className="text-xs text-gray-600 truncate">{d.name}</span>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       <span className="text-xs font-medium text-gray-800">{formatRupiahCompact(d.value)}</span>
                       <span className="text-xs text-gray-400 ml-1">({d.percentage}%)</span>
                     </div>
@@ -312,10 +395,10 @@ export default function DashboardPage() {
           </div>
           {forecastData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={forecastData} margin={{ left: 8, right: 8 }}>
+              <LineChart data={forecastData} margin={{ top: 16, left: 8, right: 16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="monthName" tick={{ fontSize: 10 }} />
-                <YAxis tickFormatter={(v) => formatRupiahCompact(v)} tick={{ fontSize: 10 }} />
+                <YAxis tickFormatter={(v) => formatRupiahCompact(v)} tick={{ fontSize: 10 }} width={56} />
                 <Tooltip
                   formatter={(value: number, name: string) => [
                     formatRupiah(value),
@@ -323,7 +406,7 @@ export default function DashboardPage() {
                   ]}
                   labelStyle={{ fontWeight: 600 }}
                 />
-                <Legend formatter={(v) => <span className="text-xs">{v === 'estimatedValue' ? 'Estimasi' : 'Weighted'}</span>} />
+                <Legend verticalAlign="bottom" formatter={(v) => <span className="text-xs">{v === 'estimatedValue' ? 'Estimasi' : 'Weighted'}</span>} />
                 <Line type="monotone" dataKey="estimatedValue" stroke="#3B82F6" strokeWidth={2} dot={{ r: 4 }} />
                 <Line type="monotone" dataKey="weightedValue" stroke="#8B5CF6" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
               </LineChart>
@@ -340,24 +423,24 @@ export default function DashboardPage() {
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Lead Source</h2>
           {(leadSource?.length ?? 0) > 0 ? (
             <>
-              <ResponsiveContainer width="100%" height={180}>
+              <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
-                  <Pie data={leadSource} dataKey="count" nameKey="source" cx="50%" cy="50%" outerRadius={70} label={({ source, percentage }) => `${source} ${percentage}%`} labelLine={false}>
+                  <Pie data={leadSource} dataKey="count" nameKey="source" cx="50%" cy="50%" outerRadius={80}>
                     {leadSource!.map((_, i) => (
                       <Cell key={i} fill={SOURCE_COLORS[i % SOURCE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number, name: string) => [v, name]} />
+                  <Tooltip formatter={(v: number, name: string) => [`${v} deals`, name]} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="mt-3 space-y-2">
+              <div className="mt-3 space-y-2.5">
                 {leadSource!.map((s, i) => (
-                  <div key={s.source} className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
+                  <div key={s.source} className="flex justify-between items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: SOURCE_COLORS[i % SOURCE_COLORS.length] }} />
-                      <span className="text-xs text-gray-600">{s.source}</span>
+                      <span className="text-xs text-gray-600 truncate">{s.source}</span>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       <span className="text-xs font-medium text-gray-800">{s.count} deals</span>
                       <span className="text-xs text-gray-400 ml-1">({s.percentage}%)</span>
                     </div>

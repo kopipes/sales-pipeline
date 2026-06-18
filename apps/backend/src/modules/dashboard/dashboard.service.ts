@@ -51,7 +51,7 @@ export class DashboardService {
       (s, d) => s + Math.round((Number(d.estimatedValue) * d.probabilityPct) / 100),
       0,
     );
-    const wonRevenue = wonDeals.reduce((s, d) => s + Number(d.estimatedValue), 0);
+    const wonRevenue = wonDeals.reduce((s, d) => s + Number(d.actualRevenue ?? d.estimatedValue), 0);
 
     // Target achievement (PRD 8.2)
     const year = filters.endDate
