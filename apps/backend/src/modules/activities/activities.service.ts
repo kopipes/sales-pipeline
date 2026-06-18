@@ -8,12 +8,22 @@ export class ActivitiesService {
 
   async findAll(
     user: ScopedUser,
-    filters: { companyId?: string; dealId?: string; search?: string } = {},
+    filters: { companyId?: string; dealId?: string; search?: string; medium?: string; dateFrom?: string; dateTo?: string } = {},
   ) {
     const where: any = { ...buildScopeWhere(user, 'salesRepId') };
 
     if (filters.companyId) where.companyId = filters.companyId;
     if (filters.dealId) where.dealId = filters.dealId;
+    if (filters.medium) where.medium = filters.medium;
+    if (filters.dateFrom || filters.dateTo) {
+      where.activityDate = {};
+      if (filters.dateFrom) where.activityDate.gte = new Date(filters.dateFrom);
+      if (filters.dateTo) {
+        const to = new Date(filters.dateTo);
+        to.setHours(23, 59, 59, 999);
+        where.activityDate.lte = to;
+      }
+    }
     if (filters.search) {
       where.OR = [
         { objective: { contains: filters.search } },

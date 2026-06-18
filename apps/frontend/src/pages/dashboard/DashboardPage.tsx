@@ -311,7 +311,7 @@ export default function DashboardPage() {
             </div>
           </div>
           {forecastData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={260}>
               <LineChart data={forecastData} margin={{ left: 8, right: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="monthName" tick={{ fontSize: 10 }} />
@@ -331,17 +331,6 @@ export default function DashboardPage() {
           ) : (
             <div className="flex items-center justify-center h-40 text-gray-400 text-sm">
               Tidak ada deal dengan expected closing date di periode ini
-            </div>
-          )}
-          {forecastData.length > 0 && (
-            <div className="mt-3 grid grid-cols-3 gap-2 border-t border-gray-100 pt-3">
-              {forecastData.map((m) => (
-                <div key={m.month} className="text-center">
-                  <p className="text-xs font-medium text-gray-700">{m.monthName}</p>
-                  <p className="text-xs text-blue-600">{formatRupiahCompact(m.estimatedValue)}</p>
-                  <p className="text-xs text-purple-500">{m.count} deal</p>
-                </div>
-              ))}
             </div>
           )}
         </div>

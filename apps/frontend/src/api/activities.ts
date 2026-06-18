@@ -2,7 +2,7 @@ import { api } from './client';
 import type { Activity } from '../types';
 
 export const activitiesApi = {
-  getAll: (params?: { companyId?: string; dealId?: string; search?: string }) =>
+  getAll: (params?: { companyId?: string; dealId?: string; search?: string; medium?: string; dateFrom?: string; dateTo?: string }) =>
     api.get<Activity[]>('/activities', { params }).then((r) => r.data),
 
   getOne: (id: string) => api.get<Activity>(`/activities/${id}`).then((r) => r.data),

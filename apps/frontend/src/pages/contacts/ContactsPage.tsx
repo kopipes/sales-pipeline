@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, User, Trash2 } from 'lucide-react';
+import { Plus, Search, User, Trash2, Phone, Mail, Building2 } from 'lucide-react';
 import { contactsApi } from '../../api/contacts';
 import Spinner from '../../components/ui/Spinner';
 import ContactForm from './ContactForm';
@@ -61,61 +61,71 @@ export default function ContactsPage() {
       {isLoading ? (
         <div className="flex justify-center py-12"><Spinner size="lg" className="text-blue-600" /></div>
       ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-left">
-                <th className="px-4 py-3 font-medium text-gray-600">Nama</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Jabatan</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Company</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Phone</th>
-                <th className="px-4 py-3 font-medium text-gray-600">Email</th>
-                <th className="px-3 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {paged.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <User size={12} className="text-gray-500" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{c.fullName}</p>
-                        {c.isPrimary && <span className="badge bg-blue-50 text-blue-600">Primary</span>}
-                      </div>
+        <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {paged.map((c) => (
+              <div key={c.id} className="card p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0 text-sm font-bold text-blue-600">
+                      {c.fullName?.[0]?.toUpperCase() ?? '?'}
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{c.jobTitle ?? '-'}</td>
-                  <td className="px-4 py-3 text-gray-600">{c.company?.name}</td>
-                  <td className="px-4 py-3 text-gray-500">{c.phone ?? '-'}</td>
-                  <td className="px-4 py-3 text-gray-500">{c.email ?? '-'}</td>
-                  <td className="px-3 py-3">
+                    <div>
+                      <p className="font-semibold text-gray-900">{c.fullName}</p>
+                      <p className="text-xs text-gray-400">{c.jobTitle ?? 'No title'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {c.isPrimary && (
+                      <span className="badge bg-blue-50 text-blue-600 text-xs">Primary</span>
+                    )}
                     <button
                       className="p-1.5 hover:bg-red-50 text-gray-300 hover:text-red-600 rounded-lg transition-colors"
                       onClick={() => { if (confirm(`Hapus ${c.fullName}?`)) deleteMutation.mutate(c.id); }}
                       aria-label={`Hapus ${c.fullName}`}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={13} />
                     </button>
-                  </td>
-                </tr>
-              ))}
-              {paged.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">Belum ada contact.</td></tr>
-              )}
-            </tbody>
-          </table>
-          <div className="px-4 pb-3">
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              totalItems={totalItems}
-              pageSize={PAGE_SIZE}
-              onPageChange={setPage}
-            />
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-1.5">
+                  {(c as any).company?.name && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Building2 size={12} className="text-gray-400 flex-shrink-0" />
+                      <span className="truncate">{(c as any).company.name}</span>
+                    </div>
+                  )}
+                  {c.phone && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Phone size={12} className="text-gray-400 flex-shrink-0" />
+                      <a href={`tel:${c.phone}`} className="hover:text-blue-600 transition-colors truncate">{c.phone}</a>
+                    </div>
+                  )}
+                  {c.email && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Mail size={12} className="text-gray-400 flex-shrink-0" />
+                      <a href={`mailto:${c.email}`} className="hover:text-blue-600 transition-colors truncate">{c.email}</a>
+                    </div>
+                  )}
+                  {!c.phone && !c.email && (
+                    <p className="text-xs text-gray-300 italic">Tidak ada kontak info</p>
+                  )}
+                </div>
+              </div>
+            ))}
+            {paged.length === 0 && (
+              <p className="col-span-3 text-center py-12 text-gray-400">Belum ada contact.</p>
+            )}
           </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </div>
       )}
     </div>

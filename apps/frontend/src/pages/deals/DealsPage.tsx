@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, ChevronRight, AlertTriangle, Download, Pencil } from 'lucide-react';
+import { Plus, Search, ChevronRight, AlertTriangle, Download, Pencil, Filter } from 'lucide-react';
 import Pagination, { paginate } from '../../components/ui/Pagination';
+import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 10;
-import { useAuth } from '../../context/AuthContext';
 import { dealsApi } from '../../api/deals';
 import { dashboardApi } from '../../api/dashboard';
 import { formatRupiahCompact, formatDate } from '../../utils/format';
@@ -28,14 +28,21 @@ export default function DealsPage() {
   const qc = useQueryClient();
   const { user, isAdmin } = useAuth();
   const [search, setSearch] = useState('');
+  const [stageId, setStageId] = useState('');
   const [page, setPage] = useState(1);
+  const [showAtRisk, setShowAtRisk] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [selected, setSelected] = useState<Deal | null>(null);
 
+  const { data: stages } = useQuery({
+    queryKey: ['deal-stages'],
+    queryFn: () => dealsApi.getStages(),
+  });
+
   const { data: deals, isLoading } = useQuery({
-    queryKey: ['deals', search],
-    queryFn: () => dealsApi.getAll({ search: search || undefined }),
+    queryKey: ['deals', search, stageId],
+    queryFn: () => dealsApi.getAll({ search: search || undefined, stageId: stageId || undefined }),
   });
 
   const totalItems = deals?.length ?? 0;
@@ -88,24 +95,78 @@ export default function DealsPage() {
 
       {/* At Risk Banner */}
       {(atRisk?.count ?? 0) > 0 && (
-        <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          <AlertTriangle size={16} className="text-red-600 flex-shrink-0" />
-          <span className="text-sm text-red-700">
-            <strong>{atRisk.count} deal berisiko</strong> — tidak ada update atau melewati expected closing date.
-          </span>
+        <div className="border border-red-200 rounded-xl overflow-hidden">
+          <button
+            className="w-full flex items-center justify-between gap-3 bg-red-50 px-4 py-3 hover:bg-red-100 transition-colors"
+            onClick={() => setShowAtRisk((v) => !v)}
+            aria-expanded={showAtRisk}
+          >
+            <div className="flex items-center gap-3">
+              <AlertTriangle size={16} className="text-red-600 flex-shrink-0" />
+              <span className="text-sm text-red-700">
+                <strong>{atRisk.count} deal berisiko</strong> — tidak ada update atau melewati expected closing date.
+              </span>
+            </div>
+            <ChevronRight
+              size={15}
+              className={clsx('text-red-400 transition-transform flex-shrink-0', showAtRisk && 'rotate-90')}
+            />
+          </button>
+          {showAtRisk && (
+            <div className="bg-white divide-y divide-gray-50">
+              {(atRisk.deals ?? []).map((d: any) => (
+                <div
+                  key={d.id}
+                  className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors"
+                  onClick={() => {
+                    const deal = (deals ?? []).find((x) => x.id === d.id);
+                    if (deal) setSelected(deal);
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-6 rounded-full bg-red-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{d.dealName}</p>
+                      <p className="text-xs text-gray-400">{d.company?.name} &middot; {d.stage}</p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-semibold text-gray-700">{formatRupiahCompact(d.estimatedValue)}</p>
+                    <p className="text-xs text-red-500">{d.reasons?.join(', ')}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          className="input pl-9"
-          placeholder="Cari deal..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          aria-label="Cari deal"
-        />
+      {/* Search + Stage Filter */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            className="input pl-9"
+            placeholder="Cari deal atau company..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            aria-label="Cari deal"
+          />
+        </div>
+        <div className="relative">
+          <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <select
+            className="input pl-8 pr-4"
+            value={stageId}
+            onChange={(e) => { setStageId(e.target.value); setPage(1); }}
+            aria-label="Filter stage"
+          >
+            <option value="">Semua Stage</option>
+            {(stages ?? []).map((s: any) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Deal Form Modal - Tambah */}

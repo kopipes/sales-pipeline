@@ -62,7 +62,8 @@ export default function GlobalSearch() {
       {/* Trigger button */}
       <button
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
-        className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-lg text-sm transition-colors"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors w-full"
+        style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}
         aria-label="Buka pencarian global"
       >
         <Search size={13} />

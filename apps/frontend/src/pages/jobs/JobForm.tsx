@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { jobsApi } from '../../api/jobs';
-import { companiesApi } from '../../api/companies';
 import { api } from '../../api/client';
+import CompanySelect from '../../components/ui/CompanySelect';
 import Spinner from '../../components/ui/Spinner';
 
 interface Props { onClose: () => void; onSuccess: () => void; }
@@ -19,7 +19,6 @@ export default function JobForm({ onClose, onSuccess }: Props) {
   });
   const [error, setError] = useState('');
 
-  const { data: companies } = useQuery({ queryKey: ['companies'], queryFn: () => companiesApi.getAll() });
   const { data: jobCategories } = useQuery({
     queryKey: ['job-categories'],
     queryFn: () => api.get('/jobs/categories').then((r) => r.data).catch(() => []),
@@ -63,10 +62,12 @@ export default function JobForm({ onClose, onSuccess }: Props) {
         <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
           <div>
             <label className="label">Client *</label>
-            <select className="input" required value={form.companyId} onChange={(e) => set('companyId', e.target.value)}>
-              <option value="">Pilih client...</option>
-              {(companies ?? []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <CompanySelect
+              value={form.companyId}
+              onChange={(id) => set('companyId', id)}
+              required
+              placeholder="Cari client..."
+            />
           </div>
           <div>
             <label className="label">Job Title *</label>

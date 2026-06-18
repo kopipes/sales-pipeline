@@ -2,44 +2,64 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { dealsApi } from '../../api/deals';
-import { companiesApi } from '../../api/companies';
 import { api } from '../../api/client';
 import Spinner from '../../components/ui/Spinner';
+import CompanySelect from '../../components/ui/CompanySelect';
+import type { Deal } from '../../types';
 
 interface Props {
+  deal?: Deal | null; // present when editing
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function DealForm({ onClose, onSuccess }: Props) {
+export default function DealForm({ deal, onClose, onSuccess }: Props) {
+  const isEdit = !!deal;
+
   const [form, setForm] = useState({
-    dealName: '',
-    companyId: '',
-    dealTypeId: '',
-    estimatedValue: '',
-    probabilityPct: '50',
-    expectedClosingDate: '',
-    remarks: '',
+    dealName: deal?.dealName ?? '',
+    companyId: deal?.companyId ?? '',
+    dealTypeId: deal?.dealTypeId ?? '',
+    estimatedValue: deal?.estimatedValue ? String(deal.estimatedValue) : '',
+    probabilityPct: deal?.probabilityPct != null ? String(deal.probabilityPct) : '50',
+    expectedClosingDate: deal?.expectedClosingDate
+      ? new Date(deal.expectedClosingDate).toISOString().split('T')[0]
+      : '',
+    remarks: deal?.remarks ?? '',
     // IP Licensing
-    ipAssetName: '',
-    royaltyPct: '',
-    minimumGuarantee: '',
+    ipAssetName: deal?.ipAssetName ?? '',
+    royaltyPct: deal?.royaltyPct != null ? String(deal.royaltyPct) : '',
+    minimumGuarantee: deal?.minimumGuarantee != null ? String(deal.minimumGuarantee) : '',
     // Job/Project
-    jobCategoryId: '',
-    billingType: 'Direct',
+    jobCategoryId: deal?.jobCategoryId ?? '',
+    billingType: deal?.billingType ?? 'Direct',
   });
   const [error, setError] = useState('');
 
-  const { data: companies } = useQuery({
-    queryKey: ['companies'],
-    queryFn: () => companiesApi.getAll(),
-  });
+  useEffect(() => {
+    if (deal) {
+      setForm({
+        dealName: deal.dealName,
+        companyId: deal.companyId,
+        dealTypeId: deal.dealTypeId,
+        estimatedValue: String(deal.estimatedValue),
+        probabilityPct: String(deal.probabilityPct),
+        expectedClosingDate: deal.expectedClosingDate
+          ? new Date(deal.expectedClosingDate).toISOString().split('T')[0]
+          : '',
+        remarks: deal.remarks ?? '',
+        ipAssetName: deal.ipAssetName ?? '',
+        royaltyPct: deal.royaltyPct != null ? String(deal.royaltyPct) : '',
+        minimumGuarantee: deal.minimumGuarantee != null ? String(deal.minimumGuarantee) : '',
+        jobCategoryId: deal.jobCategoryId ?? '',
+        billingType: deal.billingType ?? 'Direct',
+      });
+    }
+  }, [deal]);
 
   const { data: dealTypes } = useQuery({
     queryKey: ['deal-types'],
-    queryFn: () => api.get('/deals/types').then((r) => r.data).catch(() => [
-      { id: '', name: '' },
-    ]),
+    queryFn: () => api.get('/deals/types').then((r) => r.data).catch(() => []),
   });
 
   const { data: jobCategories } = useQuery({
@@ -47,17 +67,13 @@ export default function DealForm({ onClose, onSuccess }: Props) {
     queryFn: () => api.get('/jobs/categories').then((r) => r.data).catch(() => []),
   });
 
-  const { data: stages } = useQuery({
-    queryKey: ['pipeline-stages'],
-    queryFn: () => api.get('/deals/stages').then((r) => r.data).catch(() => []),
-  });
-
   const selectedDealType = (dealTypes ?? []).find((dt: any) => dt.id === form.dealTypeId);
   const isIPLicensing = selectedDealType?.name?.includes('IP Licensing');
   const isJobProject = selectedDealType?.name?.includes('Job');
 
   const mutation = useMutation({
-    mutationFn: (data: any) => dealsApi.create(data),
+    mutationFn: (data: any) =>
+      isEdit ? dealsApi.update(deal!.id, data) : dealsApi.create(data),
     onSuccess,
     onError: (e: any) => setError(e?.response?.data?.message ?? 'Terjadi kesalahan'),
   });
@@ -74,23 +90,27 @@ export default function DealForm({ onClose, onSuccess }: Props) {
       return;
     }
     mutation.mutate({
-      ...form,
+      dealName: form.dealName,
+      companyId: form.companyId,
+      dealTypeId: form.dealTypeId,
       estimatedValue: form.estimatedValue ? parseInt(form.estimatedValue.replace(/\D/g, ''), 10) : 0,
       probabilityPct: parseInt(form.probabilityPct, 10),
       minimumGuarantee: form.minimumGuarantee ? parseInt(form.minimumGuarantee.replace(/\D/g, ''), 10) : null,
       royaltyPct: form.royaltyPct ? parseFloat(form.royaltyPct) : null,
       expectedClosingDate: form.expectedClosingDate || null,
+      remarks: form.remarks || null,
       ipAssetName: form.ipAssetName || null,
       jobCategoryId: form.jobCategoryId || null,
+      billingType: form.billingType || null,
     });
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Tambah Deal">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={isEdit ? 'Edit Deal' : 'Tambah Deal'}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="font-semibold text-gray-900">Tambah Deal Baru</h2>
+          <h2 className="font-semibold text-gray-900">{isEdit ? `Edit: ${deal!.dealName}` : 'Tambah Deal Baru'}</h2>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label="Tutup">
             <X size={16} />
           </button>
@@ -106,23 +126,29 @@ export default function DealForm({ onClose, onSuccess }: Props) {
           {/* Company */}
           <div>
             <label className="label">Company *</label>
-            <select className="input" required value={form.companyId} onChange={(e) => set('companyId', e.target.value)}>
-              <option value="">Pilih company...</option>
-              {(companies ?? []).map((c: any) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <CompanySelect
+              value={form.companyId}
+              onChange={(id) => set('companyId', id)}
+              required
+            />
           </div>
 
-          {/* Deal Type */}
+          {/* Deal Type — read-only when editing to prevent field shifting */}
           <div>
             <label className="label">Deal Type *</label>
-            <select className="input" required value={form.dealTypeId} onChange={(e) => set('dealTypeId', e.target.value)}>
+            <select
+              className="input"
+              required
+              value={form.dealTypeId}
+              onChange={(e) => set('dealTypeId', e.target.value)}
+              disabled={isEdit}
+            >
               <option value="">Pilih tipe...</option>
               {(dealTypes ?? []).map((dt: any) => (
                 <option key={dt.id} value={dt.id}>{dt.name}</option>
               ))}
             </select>
+            {isEdit && <p className="text-xs text-gray-400 mt-1">Deal type tidak bisa diubah setelah dibuat.</p>}
           </div>
 
           {/* Estimated Value & Probability */}
@@ -199,7 +225,7 @@ export default function DealForm({ onClose, onSuccess }: Props) {
           <div className="flex gap-3 pt-2">
             <button type="button" className="btn-secondary flex-1" onClick={onClose}>Batal</button>
             <button type="submit" className="btn-primary flex-1" disabled={mutation.isPending}>
-              {mutation.isPending ? <Spinner size="sm" /> : 'Simpan'}
+              {mutation.isPending ? <Spinner size="sm" /> : (isEdit ? 'Simpan Perubahan' : 'Simpan')}
             </button>
           </div>
         </form>

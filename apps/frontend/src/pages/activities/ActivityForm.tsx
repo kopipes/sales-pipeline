@@ -1,35 +1,56 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { activitiesApi } from '../../api/activities';
-import { companiesApi } from '../../api/companies';
 import { contactsApi } from '../../api/contacts';
+import CompanySelect from '../../components/ui/CompanySelect';
 import Spinner from '../../components/ui/Spinner';
+import type { Activity } from '../../types';
 
 const MEDIUMS = ['Offline Meeting', 'Online Meeting', 'WA', 'Call', 'Email'];
 
 interface Props {
+  activity?: Activity | null; // present when editing
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function ActivityForm({ onClose, onSuccess }: Props) {
+export default function ActivityForm({ activity, onClose, onSuccess }: Props) {
+  const isEdit = !!activity;
+
   const [form, setForm] = useState({
-    companyId: '',
-    contactId: '',
-    activityDate: new Date().toISOString().split('T')[0],
-    medium: 'Offline Meeting',
-    objective: '',
-    resultNotes: '',
-    nextAction: '',
-    nextActionDate: '',
+    companyId: activity?.companyId ?? '',
+    contactId: (activity as any)?.contactId ?? '',
+    activityDate: activity?.activityDate
+      ? new Date(activity.activityDate).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0],
+    medium: activity?.medium ?? 'Offline Meeting',
+    objective: activity?.objective ?? '',
+    resultNotes: activity?.resultNotes ?? '',
+    nextAction: activity?.nextAction ?? '',
+    nextActionDate: activity?.nextActionDate
+      ? new Date(activity.nextActionDate).toISOString().split('T')[0]
+      : '',
   });
   const [error, setError] = useState('');
 
-  const { data: companies } = useQuery({
-    queryKey: ['companies'],
-    queryFn: () => companiesApi.getAll(),
-  });
+  // Re-sync when activity prop changes (e.g. opening edit for a different row)
+  useEffect(() => {
+    if (activity) {
+      setForm({
+        companyId: activity.companyId,
+        contactId: (activity as any).contactId ?? '',
+        activityDate: new Date(activity.activityDate).toISOString().split('T')[0],
+        medium: activity.medium,
+        objective: activity.objective,
+        resultNotes: activity.resultNotes ?? '',
+        nextAction: activity.nextAction ?? '',
+        nextActionDate: activity.nextActionDate
+          ? new Date(activity.nextActionDate).toISOString().split('T')[0]
+          : '',
+      });
+    }
+  }, [activity]);
 
   const { data: contacts } = useQuery({
     queryKey: ['contacts', form.companyId],
@@ -38,7 +59,8 @@ export default function ActivityForm({ onClose, onSuccess }: Props) {
   });
 
   const mutation = useMutation({
-    mutationFn: (data: any) => activitiesApi.create(data),
+    mutationFn: (data: any) =>
+      isEdit ? activitiesApi.update(activity!.id, data) : activitiesApi.create(data),
     onSuccess,
     onError: (e: any) => setError(e?.response?.data?.message ?? 'Terjadi kesalahan'),
   });
@@ -62,20 +84,21 @@ export default function ActivityForm({ onClose, onSuccess }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Tambah Aktivitas">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={isEdit ? 'Edit Aktivitas' : 'Tambah Aktivitas'}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="font-semibold text-gray-900">Tambah Aktivitas</h2>
+          <h2 className="font-semibold text-gray-900">{isEdit ? 'Edit Aktivitas' : 'Tambah Aktivitas'}</h2>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label="Tutup"><X size={16} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
           <div>
             <label className="label">Company *</label>
-            <select className="input" required value={form.companyId} onChange={(e) => set('companyId', e.target.value)}>
-              <option value="">Pilih company...</option>
-              {(companies ?? []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <CompanySelect
+              value={form.companyId}
+              onChange={(id) => set('companyId', id)}
+              required
+            />
           </div>
 
           {form.companyId && (
@@ -126,7 +149,7 @@ export default function ActivityForm({ onClose, onSuccess }: Props) {
           <div className="flex gap-3 pt-2">
             <button type="button" className="btn-secondary flex-1" onClick={onClose}>Batal</button>
             <button type="submit" className="btn-primary flex-1" disabled={mutation.isPending}>
-              {mutation.isPending ? <Spinner size="sm" /> : 'Simpan'}
+              {mutation.isPending ? <Spinner size="sm" /> : (isEdit ? 'Simpan Perubahan' : 'Simpan')}
             </button>
           </div>
         </form>

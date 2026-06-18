@@ -18,8 +18,11 @@ export class ActivitiesController {
     @Query('companyId') companyId?: string,
     @Query('dealId') dealId?: string,
     @Query('search') search?: string,
+    @Query('medium') medium?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
   ) {
-    return this.activitiesService.findAll(user, { companyId, dealId, search });
+    return this.activitiesService.findAll(user, { companyId, dealId, search, medium, dateFrom, dateTo });
   }
 
   @Get(':id')

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, ArrowRight, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, ArrowRight, Pencil, Trash2, Filter } from 'lucide-react';
 import { activitiesApi } from '../../api/activities';
 import { formatDate } from '../../utils/format';
 import Spinner from '../../components/ui/Spinner';
@@ -24,14 +24,24 @@ export default function ActivitiesPage() {
   const qc = useQueryClient();
   const { user, isAdmin } = useAuth();
   const [search, setSearch] = useState('');
+  const [medium, setMedium] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
+
+  const MEDIUMS = ['Offline Meeting', 'Online Meeting', 'WA', 'Call', 'Email'];
   const [showForm, setShowForm] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [promotingId, setPromotingId] = useState<string | null>(null);
 
   const { data: activities, isLoading } = useQuery({
-    queryKey: ['activities', search],
-    queryFn: () => activitiesApi.getAll({ search: search || undefined }),
+    queryKey: ['activities', search, medium, dateFrom, dateTo],
+    queryFn: () => activitiesApi.getAll({
+      search: search || undefined,
+      medium: medium || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+    }),
   });
 
   const totalItems = activities?.length ?? 0;
@@ -59,15 +69,55 @@ export default function ActivitiesPage() {
         </button>
       </div>
 
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          className="input pl-9"
-          placeholder="Cari aktivitas..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          aria-label="Cari aktivitas"
-        />
+      {/* Search + Filters */}
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-40">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            className="input pl-9"
+            placeholder="Cari aktivitas atau company..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            aria-label="Cari aktivitas"
+          />
+        </div>
+        <div className="relative">
+          <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <select
+            className="input pl-8 pr-4"
+            value={medium}
+            onChange={(e) => { setMedium(e.target.value); setPage(1); }}
+            aria-label="Filter medium"
+          >
+            <option value="">Semua Medium</option>
+            {MEDIUMS.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-2">
+          <input
+            type="date"
+            className="text-sm text-gray-700 outline-none bg-transparent"
+            value={dateFrom}
+            onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+            aria-label="Tanggal dari"
+          />
+          <span className="text-xs text-gray-400 flex-shrink-0">s/d</span>
+          <input
+            type="date"
+            className="text-sm text-gray-700 outline-none bg-transparent"
+            value={dateTo}
+            onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+            aria-label="Tanggal sampai"
+          />
+        </div>
+        {(medium || dateFrom || dateTo) && (
+          <button
+            className="btn-secondary text-xs"
+            onClick={() => { setMedium(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+          >
+            Reset Filter
+          </button>
+        )}
       </div>
 
       {showForm && (

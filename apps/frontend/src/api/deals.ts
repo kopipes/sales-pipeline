@@ -9,6 +9,8 @@ export const dealsApi = {
 
   getAtRisk: () => api.get('/deals/at-risk').then((r) => r.data),
 
+  getStages: () => api.get<{ id: string; name: string; sortOrder: number; isWon: boolean; isLost: boolean }[]>('/deals/stages').then((r) => r.data),
+
   create: (data: Partial<Deal>) => api.post<Deal>('/deals', data).then((r) => r.data),
 
   update: (id: string, data: Partial<Deal>) =>
