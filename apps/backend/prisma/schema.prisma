@@ -219,6 +219,7 @@ model Activity {
   resultNotes     String?
   nextAction      String?
   nextActionDate  DateTime?
+  nextStepFlag    Boolean   @default(false) // Flag for "NS" column in Excel - indicates if next step exists
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -245,6 +246,9 @@ model Deal {
   actualClosingDate    DateTime?
   lostReason           String?
   remarks              String?
+  
+  // Revenue tracking (Closing sheet)
+  actualRevenue        BigInt?   // Actual revenue from closing, separate from estimatedValue
   
   // IP Licensing/Sponsorship specific fields
   ipAssetName          String?

@@ -44,7 +44,12 @@ export class DealsService {
 
     if (filters.stageId) where.stageId = filters.stageId;
     if (filters.dealTypeId) where.dealTypeId = filters.dealTypeId;
-    if (filters.search) where.dealName = { contains: filters.search };
+    if (filters.search) {
+      where.OR = [
+        { dealName: { contains: filters.search } },
+        { company: { name: { contains: filters.search } } },
+      ];
+    }
 
     const deals = await this.prisma.deal.findMany({
       where,

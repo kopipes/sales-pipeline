@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildScopeWhere, ScopedUser } from '../../common/utils/scope.util';
 
@@ -14,7 +14,13 @@ export class ActivitiesService {
 
     if (filters.companyId) where.companyId = filters.companyId;
     if (filters.dealId) where.dealId = filters.dealId;
-    if (filters.search) where.objective = { contains: filters.search };
+    if (filters.search) {
+      where.OR = [
+        { objective: { contains: filters.search } },
+        { company: { name: { contains: filters.search } } },
+        { resultNotes: { contains: filters.search } },
+      ];
+    }
 
     return this.prisma.activity.findMany({
       where,
@@ -64,25 +70,37 @@ export class ActivitiesService {
     });
   }
 
-  async update(id: string, data: any) {
+  async update(user: ScopedUser, id: string, data: any) {
     const activity = await this.prisma.activity.findUnique({ where: { id } });
 
     if (!activity) {
       throw new NotFoundException('Activity not found');
     }
 
+    // Admin (scopeLevel = all) can edit any activity; others can only edit their own
+    if (user.scopeLevel !== 'all' && activity.salesRepId !== user.id) {
+      throw new ForbiddenException('Anda tidak memiliki akses untuk mengedit aktivitas ini');
+    }
+
     const payload: any = { ...data };
     if (data.activityDate) payload.activityDate = new Date(data.activityDate);
     if (data.nextActionDate) payload.nextActionDate = new Date(data.nextActionDate);
+    // Prevent escalation: never let caller override salesRepId unless admin
+    if (user.scopeLevel !== 'all') delete payload.salesRepId;
 
     return this.prisma.activity.update({ where: { id }, data: payload });
   }
 
-  async remove(id: string) {
+  async remove(user: ScopedUser, id: string) {
     const activity = await this.prisma.activity.findUnique({ where: { id } });
 
     if (!activity) {
       throw new NotFoundException('Activity not found');
+    }
+
+    // Admin (scopeLevel = all) can delete any activity; others can only delete their own
+    if (user.scopeLevel !== 'all' && activity.salesRepId !== user.id) {
+      throw new ForbiddenException('Anda tidak memiliki akses untuk menghapus aktivitas ini');
     }
 
     return this.prisma.activity.delete({ where: { id } });

@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, TrendingUp, TrendingDown, Download } from 'lucide-react';
+import Pagination, { paginate } from '../../components/ui/Pagination';
+
+const PAGE_SIZE = 10;
 import { jobsApi } from '../../api/jobs';
 import { formatRupiahCompact, formatRupiah, MONTHS } from '../../utils/format';
 import Spinner from '../../components/ui/Spinner';
@@ -18,6 +21,7 @@ const STATUS_BADGE: Record<string, string> = {
 export default function JobsPage() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [page, setPage] = useState(1);
   const year = String(new Date().getFullYear());
 
   const { data: jobs, isLoading } = useQuery({
@@ -35,6 +39,10 @@ export default function JobsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['jobs'] }),
   });
 
+  const totalItems = jobs?.length ?? 0;
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  const paged = paginate(jobs ?? [], page, PAGE_SIZE);
+
   const monthlyChart = (summary?.monthly ?? []).filter((m: any) => m.salesAmount > 0 || m.cogsAmount > 0);
 
   return (
@@ -42,7 +50,7 @@ export default function JobsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Jobs & P&L</h1>
-          <p className="text-sm text-gray-500">{jobs?.length ?? 0} job di {year}</p>
+          <p className="text-sm text-gray-500">{totalItems} job di {year}</p>
         </div>
         <div className="flex gap-2">
           <a href={`/api/dashboard/export/jobs?periodYear=${year}`} className="btn-secondary" download aria-label="Export jobs ke Excel">
@@ -121,7 +129,7 @@ export default function JobsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(jobs ?? []).map((j) => (
+              {paged.map((j) => (
                 <tr key={j.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-900 truncate max-w-[180px]">{j.jobTitle}</p>
@@ -161,11 +169,20 @@ export default function JobsPage() {
                   </td>
                 </tr>
               ))}
-              {(jobs ?? []).length === 0 && (
+              {paged.length === 0 && (
                 <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">Belum ada job di tahun ini.</td></tr>
               )}
             </tbody>
           </table>
+          <div className="px-4 pb-3">
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          </div>
         </div>
       )}
     </div>

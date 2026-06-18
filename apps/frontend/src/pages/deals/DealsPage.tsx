@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, ChevronRight, AlertTriangle, Download } from 'lucide-react';
+import { Plus, Search, ChevronRight, AlertTriangle, Download, Pencil } from 'lucide-react';
+import Pagination, { paginate } from '../../components/ui/Pagination';
+
+const PAGE_SIZE = 10;
+import { useAuth } from '../../context/AuthContext';
 import { dealsApi } from '../../api/deals';
 import { dashboardApi } from '../../api/dashboard';
 import { formatRupiahCompact, formatDate } from '../../utils/format';
@@ -22,14 +26,21 @@ const STAGE_COLORS: Record<string, string> = {
 
 export default function DealsPage() {
   const qc = useQueryClient();
+  const { user, isAdmin } = useAuth();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
+  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [selected, setSelected] = useState<Deal | null>(null);
 
   const { data: deals, isLoading } = useQuery({
     queryKey: ['deals', search],
     queryFn: () => dealsApi.getAll({ search: search || undefined }),
   });
+
+  const totalItems = deals?.length ?? 0;
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  const paged = paginate(deals ?? [], page, PAGE_SIZE);
 
   const { data: atRisk } = useQuery({
     queryKey: ['deals', 'at-risk'],
@@ -63,7 +74,7 @@ export default function DealsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Pipeline / Deals</h1>
-          <p className="text-sm text-gray-500">{deals?.length ?? 0} deal ditemukan</p>
+          <p className="text-sm text-gray-500">{totalItems} deal ditemukan</p>
         </div>
         <div className="flex gap-2">
           <a href="/api/dashboard/export/deals" className="btn-secondary" download aria-label="Export deals ke Excel">
@@ -92,16 +103,25 @@ export default function DealsPage() {
           className="input pl-9"
           placeholder="Cari deal..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           aria-label="Cari deal"
         />
       </div>
 
-      {/* Deal Form Modal */}
+      {/* Deal Form Modal - Tambah */}
       {showForm && (
         <DealForm
           onClose={() => setShowForm(false)}
           onSuccess={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ['deals'] }); }}
+        />
+      )}
+
+      {/* Deal Form Modal - Edit */}
+      {editingDeal && (
+        <DealForm
+          deal={editingDeal}
+          onClose={() => setEditingDeal(null)}
+          onSuccess={() => { setEditingDeal(null); qc.invalidateQueries({ queryKey: ['deals'] }); }}
         />
       )}
 
@@ -120,42 +140,58 @@ export default function DealsPage() {
                 <th className="px-4 py-3 font-medium text-gray-600">Weighted</th>
                 <th className="px-4 py-3 font-medium text-gray-600">Closing</th>
                 <th className="px-4 py-3 font-medium text-gray-600">Owner</th>
-                <th className="px-2 py-3" />
+                 <th className="px-2 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(deals ?? []).map((deal) => (
+              {paged.map((deal) => (
                 <tr
                   key={deal.id}
-                  className="hover:bg-gray-50 cursor-pointer transition-colors"
-                  onClick={() => setSelected(deal)}
+                  className="hover:bg-gray-50 transition-colors"
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 cursor-pointer" onClick={() => setSelected(deal)}>
                     <p className="font-medium text-gray-900 truncate max-w-[180px]">{deal.dealName}</p>
                     <p className="text-xs text-gray-400">{deal.dealType?.name}</p>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{deal.company?.name}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-gray-600 cursor-pointer" onClick={() => setSelected(deal)}>{deal.company?.name}</td>
+                  <td className="px-4 py-3 cursor-pointer" onClick={() => setSelected(deal)}>
                     <span className={clsx('badge', STAGE_COLORS[deal.stage?.name] ?? 'bg-gray-100 text-gray-600')}>
                       {deal.stage?.name}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-800 font-medium">
+                  <td className="px-4 py-3 text-gray-800 font-medium cursor-pointer" onClick={() => setSelected(deal)}>
                     {formatRupiahCompact(deal.estimatedValue)}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
+                  <td className="px-4 py-3 text-gray-500 cursor-pointer" onClick={() => setSelected(deal)}>
                     {formatRupiahCompact(deal.weightedValue)}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
+                  <td className="px-4 py-3 text-gray-500 cursor-pointer" onClick={() => setSelected(deal)}>
                     {formatDate(deal.expectedClosingDate)}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">{deal.salesRep?.fullName}</td>
+                  <td className="px-4 py-3 text-gray-500 cursor-pointer" onClick={() => setSelected(deal)}>{deal.salesRep?.fullName}</td>
                   <td className="px-2 py-3">
-                    <ChevronRight size={15} className="text-gray-400" />
+                    <div className="flex items-center gap-1">
+                      {/* Edit: admin atau owner deal */}
+                      {(isAdmin || deal.salesRep?.id === user?.id) && (
+                        <button
+                          className="p-1.5 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded transition-colors"
+                          onClick={(e) => { e.stopPropagation(); setEditingDeal(deal); }}
+                          aria-label={`Edit ${deal.dealName}`}
+                          title="Edit"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                      )}
+                      <ChevronRight
+                        size={15}
+                        className="text-gray-400 cursor-pointer"
+                        onClick={() => setSelected(deal)}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
-              {(deals ?? []).length === 0 && (
+              {paged.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
                     Belum ada deal. Klik "Tambah Deal" untuk memulai.
@@ -164,6 +200,15 @@ export default function DealsPage() {
               )}
             </tbody>
           </table>
+          <div className="px-4 pb-3">
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          </div>
         </div>
       )}
     </div>

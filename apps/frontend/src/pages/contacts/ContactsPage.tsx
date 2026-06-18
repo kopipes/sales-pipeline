@@ -4,10 +4,14 @@ import { Plus, Search, User, Trash2 } from 'lucide-react';
 import { contactsApi } from '../../api/contacts';
 import Spinner from '../../components/ui/Spinner';
 import ContactForm from './ContactForm';
+import Pagination, { paginate } from '../../components/ui/Pagination';
+
+const PAGE_SIZE = 10;
 
 export default function ContactsPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
 
   const { data: contacts, isLoading } = useQuery({
@@ -20,12 +24,16 @@ export default function ContactsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contacts'] }),
   });
 
+  const totalItems = contacts?.length ?? 0;
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  const paged = paginate(contacts ?? [], page, PAGE_SIZE);
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Contacts</h1>
-          <p className="text-sm text-gray-500">{contacts?.length ?? 0} contact</p>
+          <p className="text-sm text-gray-500">{totalItems} contact</p>
         </div>
         <button className="btn-primary" onClick={() => setShowForm(true)}>
           <Plus size={15} /> Tambah Contact
@@ -38,7 +46,7 @@ export default function ContactsPage() {
           className="input pl-9"
           placeholder="Cari contact..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           aria-label="Cari contact"
         />
       </div>
@@ -66,7 +74,7 @@ export default function ContactsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(contacts ?? []).map((c) => (
+              {paged.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -94,11 +102,20 @@ export default function ContactsPage() {
                   </td>
                 </tr>
               ))}
-              {(contacts ?? []).length === 0 && (
+              {paged.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">Belum ada contact.</td></tr>
               )}
             </tbody>
           </table>
+          <div className="px-4 pb-3">
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          </div>
         </div>
       )}
     </div>

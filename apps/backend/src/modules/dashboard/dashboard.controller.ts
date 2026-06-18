@@ -77,8 +77,36 @@ export class DashboardController {
   async recentActivities(
     @CurrentUser() user: any,
     @Query('divisionId') divisionId?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
   ) {
-    return this.dashboardService.recentActivities(user, { divisionId });
+    return this.dashboardService.recentActivities(user, {
+      divisionId,
+      limit: limit ? parseInt(limit, 10) : 5,
+      offset: offset ? parseInt(offset, 10) : 0,
+    });
+  }
+
+  @Get('lead-source')
+  @RequirePermissions({ resource: 'dashboard', action: 'read' })
+  async leadSource(
+    @CurrentUser() user: any,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('divisionId') divisionId?: string,
+  ) {
+    return this.dashboardService.leadSource(user, { startDate, endDate, divisionId });
+  }
+
+  @Get('revenue-forecast')
+  @RequirePermissions({ resource: 'dashboard', action: 'read' })
+  async revenueForecast(
+    @CurrentUser() user: any,
+    @Query('year') year?: string,
+    @Query('month') month?: string,
+    @Query('divisionId') divisionId?: string,
+  ) {
+    return this.dashboardService.revenueForecast(user, { year, month, divisionId });
   }
 
   @Get('search')

@@ -51,10 +51,17 @@ function excelDate(val: any): Date | null {
   return isNaN(parsed.getTime()) ? null : parsed;
 }
 
-// ── Company/Contact dedup cache ───────────────────────────────────────────────
+/** Extract year from sheet name (e.g., "Copy of Starlight 2025" → 2025) */
+function extractYearFromSheet(sheetName: string): number {
+  const match = sheetName.match(/\d{4}/);
+  return match ? parseInt(match[0], 10) : new Date().getFullYear();
+}
+
+// ── Company/Contact/Industry dedup cache ──────────────────────────────────────
 
 const companyCache = new Map<string, string>(); // normalized name → id
 const industryCache = new Map<string, string>(); // name → id
+const contactCache = new Map<string, string>(); // "companyId::fullName" → id
 
 async function ensureCompany(
   rawName: string,
@@ -99,18 +106,42 @@ async function ensureIndustry(raw: string): Promise<string> {
 
   let ind = await prisma.industry.findFirst({ where: { name } });
   if (!ind) {
-    // Try to find close match (trailing spaces)
-    ind = await prisma.industry.findFirst({
-      where: { name: { contains: name.split(' ')[0] } },
+    ind = await prisma.industry.create({
+      data: { name },
     });
+    console.log(`  ✓ Created industry: ${name}`);
   }
-  if (!ind) {
-    ind = await prisma.industry.create({ data: { name } });
-  }
+
   industryCache.set(name, ind.id);
   return ind.id;
 }
 
+async function ensureContact(companyId: string, fullName: string, jobTitle?: string): Promise<string> {
+  const cacheKey = `${companyId}::${fullName.toLowerCase()}`;
+  if (contactCache.has(cacheKey)) return contactCache.get(cacheKey)!;
+
+  let contact = await prisma.contact.findFirst({
+    where: {
+      companyId,
+      fullName: fullName,
+    },
+  });
+
+  if (!contact) {
+    contact = await prisma.contact.create({
+      data: {
+        companyId,
+        fullName,
+        jobTitle: jobTitle || null,
+        isPrimary: true,
+      },
+    });
+    console.log(`  ✓ Created contact: ${fullName} (${jobTitle || 'N/A'})`);
+  }
+
+  contactCache.set(cacheKey, contact.id);
+  return contact.id;
+}
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
@@ -132,6 +163,7 @@ async function main() {
   const stageByName = Object.fromEntries(stages.map((s) => [s.name.toLowerCase(), s]));
   const wonStage = stages.find((s) => s.isWon)!;
   const leadStage = stages.find((s) => s.sortOrder === 1)!;
+  const qualifiedStage = stageByName['qualified'];
   const proposalStage = stageByName['proposal'];
   const negotiationStage = stageByName['negotiation'];
 
@@ -149,6 +181,7 @@ async function main() {
   console.log('1. Migrating Canvassing → Activities...');
   const canvRows = XLSX.utils.sheet_to_json<any>(wb1.Sheets['Canvassing'], { defval: '' });
   let actCount = 0;
+  let contactCount = 0;
 
   for (const row of canvRows) {
     const companyName = trim(row['Company']);
@@ -162,8 +195,20 @@ async function main() {
     );
     if (!companyId) continue;
 
+    // Create/link contact if PIC exists
+    let contactId: string | null = null;
+    const picName = trim(row['PIC']);
+    const picTitle = trim(row['Tittle']);
+    if (picName) {
+      contactId = await ensureContact(companyId, picName, picTitle);
+      contactCount++;
+    }
+
     const actDate = excelDate(row['Tgl Meeting'] || row['Date']) ?? new Date('2025-01-01');
     const nextActionDate = excelDate(row['Tgl Meeting'] || null);
+    // Parse "NS" column (Next Step flag: 0/1 or empty)
+    const nsValue = row['NS'];
+    const nextStepFlag = nsValue === 1 || nsValue === '1' || nsValue === true;
 
     const existing = await prisma.activity.findFirst({
       where: {
@@ -176,6 +221,7 @@ async function main() {
     await prisma.activity.create({
       data: {
         companyId,
+        contactId: contactId || null,
         divisionId: defaultDivision.id,
         salesRepId: salesUser.id,
         activityDate: actDate,
@@ -184,11 +230,73 @@ async function main() {
         resultNotes: trim(row['Hasil Meeting']) || null,
         nextAction: trim(row['Progress '] || row['Progress']) || null,
         nextActionDate: nextActionDate ?? null,
+        nextStepFlag: nextStepFlag,
       },
     });
     actCount++;
   }
   console.log(`   ✅ ${actCount} activities migrated`);
+  console.log(`   ✅ ${contactCount} contacts created/linked`);
+
+  // ── Sheet: Sheet1 (alternate Canvassing format) → Activities ─────────────────
+  // Sheet1 has different column names: Comp, Brand/Project, Indrustri (typo), Tanggal, NS flag
+  console.log('1b. Migrating Sheet1 → Activities...');
+  const sheet1Rows = XLSX.utils.sheet_to_json<any>(wb1.Sheets['Sheet1'], { defval: '' });
+  let sheet1Count = 0;
+
+  for (const row of sheet1Rows) {
+    const companyName = trim(row['Comp']);
+    if (!companyName) continue;
+
+    const industry = trim(row['Indrustri']) || 'Other';
+    const companyId = await ensureCompany(companyName, industry, 'Direct', admin.id);
+    if (!companyId) continue;
+
+    // Create/link contact if PIC exists
+    let contactId: string | null = null;
+    const picName = trim(row['PIC']);
+    if (picName) {
+      contactId = await ensureContact(companyId, picName, trim(row['Brand/Project']) || undefined);
+      contactCount++;
+    }
+
+    const actDate = excelDate(row['Tanggal']) ?? new Date('2025-01-01');
+    // NS = Next Step flag
+    const nsValue = row['NS'];
+    const nextStepFlag = nsValue === 1 || nsValue === '1' || nsValue === true;
+
+    // Combine results and remarks
+    const resultNotes = trim(row['Hasil Meeting']) || null;
+    const remarks = trim(row['Remarks '] || row['__EMPTY']) || null;
+    const combinedNotes = [resultNotes, remarks].filter(Boolean).join(' | ');
+
+    // Deduplication: skip if company + result already exists
+    const existing = await prisma.activity.findFirst({
+      where: {
+        companyId,
+        resultNotes: { contains: resultNotes?.substring(0, 20) || '' },
+      },
+    });
+    if (existing) continue;
+
+    await prisma.activity.create({
+      data: {
+        companyId,
+        contactId: contactId || null,
+        divisionId: defaultDivision.id,
+        salesRepId: salesUser.id,
+        activityDate: actDate,
+        medium: 'Offline Meeting',
+        objective: trim(row['Brand/Project']) || 'Perkenalan',
+        resultNotes: combinedNotes || null,
+        nextAction: trim(row['Progress ']) || null,
+        nextActionDate: null,
+        nextStepFlag: nextStepFlag,
+      },
+    });
+    sheet1Count++;
+  }
+  console.log(`   ✅ ${sheet1Count} Sheet1 activities migrated`);
 
   // ── Sheet: Pipeline → Deals ──────────────────────────────────────────────────
   console.log('2. Migrating Pipeline → Deals...');
@@ -198,14 +306,21 @@ async function main() {
   // Map stage free-text → baku
   function mapStage(raw: string) {
     const s = raw.toLowerCase().trim();
+    // Empty stage = already has progress, at least Qualified
+    if (!s || s === '') return qualifiedStage;
     if (s.includes('proposal') || s.includes('propose') || s.includes('share')) return proposalStage;
     if (s.includes('discus') || s.includes('proses') || s.includes('negoti')) return negotiationStage;
-    return leadStage;
+    return qualifiedStage;
   }
 
   for (const row of pipeRows) {
     const prospectName = trim(row['Prospect Name']);
-    if (!prospectName) continue;
+    // Filter out summary rows like "Jumlah" or empty names
+    if (!prospectName || prospectName === 'Jumlah' || prospectName === 'Total') continue;
+
+    const estimatedValue = typeof row['Estimated Value'] === 'number' ? Math.round(row['Estimated Value']) : 0;
+    // Skip deals with zero value (likely placeholders)
+    if (estimatedValue === 0) continue;
 
     const companyId = await ensureCompany(prospectName, '', 'Direct', admin.id);
     const stage = mapStage(trim(row['Stage']));
@@ -223,7 +338,7 @@ async function main() {
         salesRepId: salesUser.id,
         dealTypeId: ipDealType.id,
         stageId: stage.id,
-        estimatedValue: typeof row['Estimated Value'] === 'number' ? Math.min(Math.round(row['Estimated Value']), 2147483647) : 0,
+        estimatedValue,
         probabilityPct: typeof row['Probability (%)'] === 'number' ? Math.round(row['Probability (%)']) : 0,
         ipAssetName: trim(row['IP Offered']) || null,
         expectedClosingDate: excelDate(row['Expected Closing']) ?? null,
@@ -259,6 +374,7 @@ async function main() {
         dealTypeId: ipDealType.id,
         stageId: wonStage.id,
         estimatedValue: typeof row['Deal Value'] === 'number' ? Math.round(row['Deal Value']) : 0,
+        actualRevenue: typeof row['Revenue'] === 'number' ? Math.round(row['Revenue']) : null,
         probabilityPct: 100,
         ipAssetName: trim(row['IP']) || null,
         royaltyPct: typeof row['Royalty (%)'] === 'number' ? row['Royalty (%)'] : null,
@@ -278,7 +394,11 @@ async function main() {
   console.log('4. Migrating report-abc-p → Jobs...');
   const ip2Path = path.resolve(__dirname, '../../../files/report-abc-p.xlsx');
   const wb2 = XLSX.readFile(ip2Path);
-  const rawRows = XLSX.utils.sheet_to_json<any[]>(wb2.Sheets['Copy of Starlight 2025'], {
+  const sheetName = wb2.SheetNames[0]; // "Copy of Starlight 2025"
+  const jobYear = extractYearFromSheet(sheetName);
+  console.log(`   Using year: ${jobYear} (from sheet: "${sheetName}")`);
+
+  const rawRows = XLSX.utils.sheet_to_json<any[]>(wb2.Sheets[sheetName], {
     defval: '',
     header: 1,
   });
@@ -312,7 +432,7 @@ async function main() {
     if (!deal) {
       deal = await prisma.deal.create({
         data: {
-          dealName: `${normalizeCompany(trim(client))} - Historis 2025`,
+          dealName: `${normalizeCompany(trim(client))} - Historis ${jobYear}`,
           companyId,
           divisionId: defaultDivision.id,
           salesRepId: salesUser.id,
@@ -320,8 +440,8 @@ async function main() {
           stageId: wonStage.id,
           estimatedValue: 0,
           probabilityPct: 100,
-          actualClosingDate: new Date('2025-01-01'),
-          stageChangedAt: new Date('2025-01-01'),
+          actualClosingDate: new Date(`${jobYear}-01-01`),
+          stageChangedAt: new Date(`${jobYear}-01-01`),
         },
       });
       await prisma.dealStageHistory.create({
@@ -336,7 +456,7 @@ async function main() {
       ?? jobCats[0];
 
     const existing = await prisma.job.findFirst({
-      where: { dealId: deal.id, jobTitle: { contains: jobTitle.substring(0, 20) }, periodMonth: month, periodYear: 2025 },
+      where: { dealId: deal.id, jobTitle, periodMonth: month, periodYear: jobYear },
     });
     if (existing) continue;
 
@@ -348,7 +468,7 @@ async function main() {
         jobTitle,
         jobCategoryId: cat.id,
         periodMonth: month,
-        periodYear: 2025,
+        periodYear: jobYear,
         salesAmount,
         cogsAmount,
         billingType: billingType === 'Direct' || billingType === 'Agency' ? billingType : 'Direct',

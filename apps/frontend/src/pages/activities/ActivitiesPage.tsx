@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, ChevronRight, ArrowRight } from 'lucide-react';
+import { Plus, Search, ArrowRight, Pencil, Trash2 } from 'lucide-react';
 import { activitiesApi } from '../../api/activities';
-import { formatDate, timeAgo } from '../../utils/format';
+import { formatDate } from '../../utils/format';
 import Spinner from '../../components/ui/Spinner';
 import ActivityForm from './ActivityForm';
 import PromoteToDealForm from './PromoteToDealForm';
+import Pagination, { paginate } from '../../components/ui/Pagination';
 import type { Activity } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+
+const PAGE_SIZE = 10;
 
 const MEDIUM_BADGE: Record<string, string> = {
   'Offline Meeting': 'bg-blue-100 text-blue-700',
@@ -18,14 +22,21 @@ const MEDIUM_BADGE: Record<string, string> = {
 
 export default function ActivitiesPage() {
   const qc = useQueryClient();
+  const { user, isAdmin } = useAuth();
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [promotingId, setPromotingId] = useState<string | null>(null);
 
   const { data: activities, isLoading } = useQuery({
     queryKey: ['activities', search],
     queryFn: () => activitiesApi.getAll({ search: search || undefined }),
   });
+
+  const totalItems = activities?.length ?? 0;
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  const paged = paginate(activities ?? [], page, PAGE_SIZE);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => activitiesApi.remove(id),
@@ -41,7 +52,7 @@ export default function ActivitiesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Aktivitas / Canvassing</h1>
-          <p className="text-sm text-gray-500">{activities?.length ?? 0} aktivitas</p>
+          <p className="text-sm text-gray-500">{totalItems} aktivitas</p>
         </div>
         <button className="btn-primary" onClick={() => setShowForm(true)}>
           <Plus size={15} /> Tambah Aktivitas
@@ -54,7 +65,7 @@ export default function ActivitiesPage() {
           className="input pl-9"
           placeholder="Cari aktivitas..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           aria-label="Cari aktivitas"
         />
       </div>
@@ -63,6 +74,14 @@ export default function ActivitiesPage() {
         <ActivityForm
           onClose={() => setShowForm(false)}
           onSuccess={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ['activities'] }); }}
+        />
+      )}
+
+      {editingActivity && (
+        <ActivityForm
+          activity={editingActivity}
+          onClose={() => setEditingActivity(null)}
+          onSuccess={() => { setEditingActivity(null); qc.invalidateQueries({ queryKey: ['activities'] }); }}
         />
       )}
 
@@ -95,7 +114,7 @@ export default function ActivitiesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {(activities ?? []).map((a) => (
+              {paged.map((a) => (
                 <tr key={a.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
                     <p className="font-medium text-gray-900 truncate max-w-[200px]">{a.objective}</p>
@@ -132,18 +151,33 @@ export default function ActivitiesPage() {
                           <ArrowRight size={12} /> Deal
                         </button>
                       )}
-                      <button
-                        className="p-1.5 hover:bg-red-50 hover:text-red-600 rounded text-gray-400 transition-colors"
-                        onClick={() => { if (confirm('Hapus aktivitas ini?')) deleteMutation.mutate(a.id); }}
-                        aria-label="Hapus"
-                      >
-                        <ChevronRight size={14} />
-                      </button>
+                      {/* Edit: admin bisa edit semua, user hanya edit miliknya */}
+                      {(isAdmin || a.salesRep?.id === user?.id) && (
+                        <button
+                          className="p-1.5 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded transition-colors"
+                          onClick={() => setEditingActivity(a)}
+                          aria-label={`Edit aktivitas ${a.objective}`}
+                          title="Edit"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                      )}
+                      {/* Delete: admin bisa hapus semua, user hanya hapus miliknya */}
+                      {(isAdmin || a.salesRep?.id === user?.id) && (
+                        <button
+                          className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded transition-colors"
+                          onClick={() => { if (confirm('Hapus aktivitas ini?')) deleteMutation.mutate(a.id); }}
+                          aria-label={`Hapus aktivitas ${a.objective}`}
+                          title="Hapus"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
               ))}
-              {(activities ?? []).length === 0 && (
+              {paged.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
                     Belum ada aktivitas.
@@ -152,6 +186,15 @@ export default function ActivitiesPage() {
               )}
             </tbody>
           </table>
+          <div className="px-4 pb-3">
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          </div>
         </div>
       )}
     </div>

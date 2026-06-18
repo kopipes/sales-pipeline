@@ -46,13 +46,13 @@ export class ActivitiesController {
 
   @Put(':id')
   @RequirePermissions({ resource: 'activities', action: 'update' })
-  async update(@Param('id') id: string, @Body() data: any) {
-    return this.activitiesService.update(id, data);
+  async update(@CurrentUser() user: any, @Param('id') id: string, @Body() data: any) {
+    return this.activitiesService.update(user, id, data);
   }
 
   @Delete(':id')
   @RequirePermissions({ resource: 'activities', action: 'delete' })
-  async remove(@Param('id') id: string) {
-    return this.activitiesService.remove(id);
+  async remove(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.activitiesService.remove(user, id);
   }
 }
