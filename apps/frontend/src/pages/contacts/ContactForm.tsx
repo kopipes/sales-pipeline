@@ -1,20 +1,34 @@
 import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { contactsApi } from '../../api/contacts';
 import CompanySelect from '../../components/ui/CompanySelect';
 import Spinner from '../../components/ui/Spinner';
+import type { Contact } from '../../types';
 
-interface Props { onClose: () => void; onSuccess: () => void; }
+interface Props {
+  contact?: Contact;  // if provided, form is in edit mode
+  onClose: () => void;
+  onSuccess: () => void;
+}
 
-export default function ContactForm({ onClose, onSuccess }: Props) {
+export default function ContactForm({ contact, onClose, onSuccess }: Props) {
+  const isEdit = !!contact;
+
   const [form, setForm] = useState({
-    companyId: '', fullName: '', jobTitle: '', phone: '', email: '', isPrimary: false, notes: '',
+    companyId: contact?.companyId ?? '',
+    fullName: contact?.fullName ?? '',
+    jobTitle: contact?.jobTitle ?? '',
+    phone: contact?.phone ?? '',
+    email: contact?.email ?? '',
+    isPrimary: contact?.isPrimary ?? false,
+    notes: (contact as any)?.notes ?? '',
   });
   const [error, setError] = useState('');
 
   const mutation = useMutation({
-    mutationFn: (data: any) => contactsApi.create(data),
+    mutationFn: (data: any) =>
+      isEdit ? contactsApi.update(contact!.id, data) : contactsApi.create(data),
     onSuccess,
     onError: (e: any) => setError(e?.response?.data?.message ?? 'Terjadi kesalahan'),
   });
@@ -34,10 +48,10 @@ export default function ContactForm({ onClose, onSuccess }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Tambah Contact">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={isEdit ? 'Edit Contact' : 'Tambah Contact'}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="font-semibold text-gray-900">Tambah Contact</h2>
+          <h2 className="font-semibold text-gray-900">{isEdit ? 'Edit Contact' : 'Tambah Contact'}</h2>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label="Tutup"><X size={16} /></button>
         </div>
         <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
@@ -67,6 +81,15 @@ export default function ContactForm({ onClose, onSuccess }: Props) {
               <input className="input" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
             </div>
           </div>
+          <div>
+            <label className="label">Notes</label>
+            <textarea
+              className="input min-h-[72px] resize-y"
+              value={form.notes}
+              onChange={(e) => set('notes', e.target.value)}
+              placeholder="Catatan tambahan..."
+            />
+          </div>
           <div className="flex items-center gap-2">
             <input
               id="isPrimary"
@@ -81,7 +104,7 @@ export default function ContactForm({ onClose, onSuccess }: Props) {
           <div className="flex gap-3 pt-2">
             <button type="button" className="btn-secondary flex-1" onClick={onClose}>Batal</button>
             <button type="submit" className="btn-primary flex-1" disabled={mutation.isPending}>
-              {mutation.isPending ? <Spinner size="sm" /> : 'Simpan'}
+              {mutation.isPending ? <Spinner size="sm" /> : isEdit ? 'Simpan Perubahan' : 'Simpan'}
             </button>
           </div>
         </form>

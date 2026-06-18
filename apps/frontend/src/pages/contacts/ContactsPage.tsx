@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, User, Trash2, Phone, Mail, Building2 } from 'lucide-react';
+import { Plus, Search, Trash2, Pencil, Phone, Mail, Building2 } from 'lucide-react';
 import { contactsApi } from '../../api/contacts';
 import Spinner from '../../components/ui/Spinner';
 import ContactForm from './ContactForm';
 import Pagination, { paginate } from '../../components/ui/Pagination';
+import type { Contact } from '../../types';
 
 const PAGE_SIZE = 10;
 
@@ -13,6 +14,7 @@ export default function ContactsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
+  const [editContact, setEditContact] = useState<Contact | null>(null);
 
   const { data: contacts, isLoading } = useQuery({
     queryKey: ['contacts', search],
@@ -35,7 +37,7 @@ export default function ContactsPage() {
           <h1 className="text-xl font-bold text-gray-900">Contacts</h1>
           <p className="text-sm text-gray-500">{totalItems} contact</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm(true)}>
+        <button className="btn-primary" onClick={() => { setEditContact(null); setShowForm(true); }}>
           <Plus size={15} /> Tambah Contact
         </button>
       </div>
@@ -53,8 +55,9 @@ export default function ContactsPage() {
 
       {showForm && (
         <ContactForm
-          onClose={() => setShowForm(false)}
-          onSuccess={() => { setShowForm(false); qc.invalidateQueries({ queryKey: ['contacts'] }); }}
+          contact={editContact ?? undefined}
+          onClose={() => { setShowForm(false); setEditContact(null); }}
+          onSuccess={() => { setShowForm(false); setEditContact(null); qc.invalidateQueries({ queryKey: ['contacts'] }); }}
         />
       )}
 
@@ -80,6 +83,13 @@ export default function ContactsPage() {
                     {c.isPrimary && (
                       <span className="badge bg-blue-50 text-blue-600 text-xs">Primary</span>
                     )}
+                    <button
+                      className="p-1.5 hover:bg-blue-50 text-gray-300 hover:text-blue-600 rounded-lg transition-colors"
+                      onClick={() => { setEditContact(c); setShowForm(true); }}
+                      aria-label={`Edit ${c.fullName}`}
+                    >
+                      <Pencil size={13} />
+                    </button>
                     <button
                       className="p-1.5 hover:bg-red-50 text-gray-300 hover:text-red-600 rounded-lg transition-colors"
                       onClick={() => { if (confirm(`Hapus ${c.fullName}?`)) deleteMutation.mutate(c.id); }}
